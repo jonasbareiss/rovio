@@ -508,7 +508,7 @@ class RovioNode {
 
         lastTwistLin_ = lastTwistLin_ +
             dt_ * (
-                V3D(imu_msg->angular_velocity.x, imu_msg->angular_velocity.y, imu_msg->angular_velocity.z)
+                V3D(imu_msg->linear_acceleration.x, imu_msg->linear_acceleration.y, imu_msg->linear_acceleration.z)
                     - mpFilter_->safe_.state_.acb()
                     - lastQuat_.rotate(V3D(0.0, 0.0, 9.81))
             );
