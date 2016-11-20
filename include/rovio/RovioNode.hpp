@@ -495,13 +495,16 @@ class RovioNode {
         dt_ = imu_msg->header.stamp.toSec() - lastTimestamp_;
         lastTimestamp_ = imu_msg->header.stamp.toSec();
 
+        // WrWM = WrWM + dt*qWM*BvB
         lastPos_ = lastPos_ + dt_ * lastQuat_.inverted().rotate(lastTwistLin_);
 
-        Eigen::Vector4d dQuat_ = - dt_ * 0.5 * lastQuat_.getGlobalQuaternionDiffMatrix().transpose() * lastTwistAng_;
-        double qProjection_ = dQuat_.transpose() * lastQuat_.vector();
-        double quatNormalization_ = sqrt(
-            pow(lastQuat_.norm() + qProjection_, 2.0) + pow(dQuat_.norm(), 2.0) - pow(qProjection_, 2.0));
-        lastQuat_ = QPD(1 / quatNormalization_ * (lastQuat_.vector() + dQuat_));
+        // dqWB = 0.5*H_bar(qWB)*BwWB
+        Eigen::Vector4d dQuat_ = 0.5*dt_*lastQuat_.inverted().getLocalQuaternionDiffMatrix().transpose()*lastTwistAng_;
+
+        // qBW = inverse(qWB+dqWB)
+        lastQuat_ = QPD(1/((dQuat_+lastQuat_.inverted().vector()).norm())*
+            ((dQuat_+lastQuat_.inverted().vector()))
+        ).inverted();
 
         lastTwistLin_ = lastTwistLin_ +
             dt_ * (
@@ -511,12 +514,6 @@ class RovioNode {
             );
 
         lastTwistAng_ = V3D(imu_msg->angular_velocity.x, imu_msg->angular_velocity.y, imu_msg->angular_velocity.z) - mpFilter_->safe_.state_.gyb();
-
-        std::cout << "received imu msg: "
-                  << V3D(imu_msg->linear_acceleration.x, imu_msg->linear_acceleration.y, imu_msg->linear_acceleration.z)
-                  << std::endl;
-        std::cout << "bias subtracted: " << mpFilter_->safe_.state_.acb() << std::endl;
-        std::cout << "gravity subtracted: " << -lastQuat_.rotate(V3D(0.0, 0.0, 9.81)) << std::endl;
       }
 
 
@@ -758,7 +755,6 @@ class RovioNode {
       }
 
       if (mpFilter_->safe_.t_ > oldSafeTime) { // Publish everything only if something changed
-        std::cout << "something changed, publishing" << std::endl;
         for (int i = 0; i < mtState::nCam_; i++) {
           if (!mpFilter_->safe_.img_[i].empty() && mpImgUpdate_->doFrameVisualisation_) {
             cv::imshow("Tracker" + std::to_string(i), mpFilter_->safe_.img_[i]);
