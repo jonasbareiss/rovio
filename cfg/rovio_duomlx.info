@@ -7,24 +7,26 @@ Common
 	verbose false;				Is the verbose active
 }
 Camera0
-{												Camera-Calibration file for intrinsics
-	qCM_x  0.707;										X-entry of IMU to Camera quaterion (Hamilton)
+{
+	CalibrationFile;												Camera-Calibration file for intrinsics
+	qCM_x  0;										X-entry of IMU to Camera quaterion (Hamilton)
 	qCM_y  0;										Y-entry of IMU to Camera quaterion (Hamilton)
 	qCM_z  0;											Z-entry of IMU to Camera quaterion (Hamilton)
-	qCM_w   0.707;											W-entry of IMU to Camera quaterion (Hamilton)
+	qCM_w   1;											W-entry of IMU to Camera quaterion (Hamilton)
 	MrMC_x -0.015;											X-entry of IMU to Camera vector (expressed in IMU CF) [m]
 	MrMC_y 0;										Y-entry of IMU to Camera vector (expressed in IMU CF) [m]
-	MrMC_z -0.01;											Z-entry of IMU to Camera vector (expressed in IMU CF) [m]
+	MrMC_z 0.01;											Z-entry of IMU to Camera vector (expressed in IMU CF) [m]
 }
 Camera1
-{												Camera-Calibration file for intrinsics
-	qCM_x  0.707;										X-entry of IMU to Camera quaterion (Hamilton)
+{
+	CalibrationFile;												Camera-Calibration file for intrinsics
+	qCM_x  0;										X-entry of IMU to Camera quaterion (Hamilton)
 	qCM_y  0;										Y-entry of IMU to Camera quaterion (Hamilton)
 	qCM_z  0;											Z-entry of IMU to Camera quaterion (Hamilton)
-	qCM_w  0.707;											W-entry of IMU to Camera quaterion (Hamilton)
+	qCM_w  1.0;											W-entry of IMU to Camera quaterion (Hamilton)
 	MrMC_x 0.015;											X-entry of IMU to Camera vector (expressed in IMU CF) [m]
 	MrMC_y 0;										Y-entry of IMU to Camera vector (expressed in IMU CF) [m]
-	MrMC_z -0.01;											Z-entry of IMU to Camera vector (expressed in IMU CF) [m]
+	MrMC_z 0.01;											Z-entry of IMU to Camera vector (expressed in IMU CF) [m]
 }
 Init
 {
