@@ -1,13 +1,13 @@
-image_width: 752
+image_width: 640
 image_height: 480
 camera_name: cam0
 camera_matrix:
   rows: 3
   cols: 3
-  data: [330.6059, 0.0, 498.8612, 0.0, 330.6059, 255.3782, 0.0, 0.0, 1.0] # prerectified
+  data: [309.737621, 0.000000, 336.148447, 0.000000, 311.110425, 234.189391, 0.000000, 0.000000, 1.000000]
 distortion_model: plumb_bob
 distortion_coefficients:
   rows: 1
   cols: 5
-  data:  [1,0,0,0,0]
+  data: [0.006607, 0.006741, 0.023005, 0.009659, 0.000000]
 
