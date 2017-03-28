@@ -67,6 +67,7 @@ find_package(catkin REQUIRED COMPONENTS
 	std_msgs
 	tf
 	rosbag
+	yaml_cpp_catkin
 )
 
 add_service_files(
@@ -95,7 +96,7 @@ catkin_package(
 	std_msgs
 	tf
 	rosbag
-  yaml_cpp_catkin
+  	yaml_cpp_catkin
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${YamlCpp_INCLUDE_DIRS})
