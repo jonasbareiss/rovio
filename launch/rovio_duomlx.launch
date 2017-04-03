@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+
+<launch>
+<node name="duo_cam" pkg="duo_cam" type="duo_cam_node" output="screen" >
+    <param name="video_device" value="/dev/duo0" />
+    <param name="image_width" value="320" />
+    <param name="image_height" value="480" />
+    <param name="pixel_format" value="yuyv" />
+    <param name="camera_frame_id" value="duo_cam" />
+    <param name="io_method" value="mmap" />
+    <param name="frequency" value="30" />
+</node>
+<remap from="cam0/image_raw" to="/stereo/leftimage" />
+<remap from="cam1/image_raw" to="/stereo/rightimage" />
+<remap from="imu0" to="/stereo/imu" />
+  <node pkg="rovio" type="rovio_node" name="rovio" output="screen">
+  <param name="filter_config" value="$(find rovio)/cfg/rovio_duomlx.info"/>
+  <param name="camera0_config" value="$(find rovio)/cfg/duomlx_cam0.yaml"/>
+  <param name="camera1_config" value="$(find rovio)/cfg/duomlx_cam1.yaml"/>
+  </node>
+</launch>
