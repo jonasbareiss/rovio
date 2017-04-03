@@ -115,6 +115,7 @@ class RovioNode{
   FilterInitializationState init_state_;
 
   bool forceOdometryPublishing_;
+  bool forcePoseWithCovariancePublishing_;
   bool forceTransformPublishing_;
   bool forceExtrinsicsPublishing_;
   bool forceImuBiasPublishing_;
@@ -137,6 +138,8 @@ class RovioNode{
   ros::ServiceServer srvResetToPoseFilter_;
   ros::Publisher pubOdometry_;
   ros::Publisher pubTransform_;
+  ros::Publisher pubPoseWithCovStamped_;
+  ros::Publisher pub_T_J_W_transform;
   tf::TransformBroadcaster tb_;
   ros::Publisher pubPcl_;            /**<Publisher: Ros point cloud, visualizing the landmarks.*/
   ros::Publisher pubPatch_;            /**<Publisher: Patch data.*/
@@ -146,7 +149,9 @@ class RovioNode{
 
   // Ros Messages
   geometry_msgs::TransformStamped transformMsg_;
+  geometry_msgs::TransformStamped T_J_W_Msg_;
   nav_msgs::Odometry odometryMsg_;
+  geometry_msgs::PoseWithCovarianceStamped estimatedPoseWithCovarianceStampedMsg_;
   geometry_msgs::PoseWithCovarianceStamped extrinsicsMsg_[mtState::nCam_];
   sensor_msgs::PointCloud2 pclMsg_;
   sensor_msgs::PointCloud2 patchMsg_;
@@ -190,6 +195,7 @@ class RovioNode{
     mpImgUpdate_ = &std::get<0>(mpFilter_->mUpdates_);
     mpPoseUpdate_ = &std::get<1>(mpFilter_->mUpdates_);
     forceOdometryPublishing_ = false;
+    forcePoseWithCovariancePublishing_ = false;
     forceTransformPublishing_ = false;
     forceExtrinsicsPublishing_ = false;
     forceImuBiasPublishing_ = false;
@@ -213,9 +219,12 @@ class RovioNode{
     // Advertise topics
     pubTransform_ = nh_.advertise<geometry_msgs::TransformStamped>("rovio/transform", 1);
     pubOdometry_ = nh_.advertise<nav_msgs::Odometry>("rovio/odometry", 1);
+    pubPoseWithCovStamped_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("rovio/pose_with_covariance_stamped", 1);
     pubPcl_ = nh_.advertise<sensor_msgs::PointCloud2>("rovio/pcl", 1);
     pubPatch_ = nh_.advertise<sensor_msgs::PointCloud2>("rovio/patch", 1);
     pubMarkers_ = nh_.advertise<visualization_msgs::Marker>("rovio/markers", 1 );
+
+    pub_T_J_W_transform = nh_.advertise<geometry_msgs::TransformStamped>("rovio/T_G_W", 1);
     for(int camID=0;camID<mtState::nCam_;camID++){
       pubExtrinsics_[camID] = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("rovio/extrinsics" + std::to_string(camID), 1 );
     }
@@ -234,6 +243,10 @@ class RovioNode{
     // Initialize messages
     transformMsg_.header.frame_id = world_frame_;
     transformMsg_.child_frame_id = imu_frame_;
+
+    T_J_W_Msg_.child_frame_id = world_frame_;
+    T_J_W_Msg_.header.frame_id = map_frame_;
+
     odometryMsg_.header.frame_id = world_frame_;
     odometryMsg_.child_frame_id = imu_frame_;
     msgSeq_ = 1;
@@ -539,7 +552,7 @@ class RovioNode{
     if(init_state_.isInitialized()) {
       Eigen::Vector3d JrJV(odometry->pose.pose.position.x,odometry->pose.pose.position.y,odometry->pose.pose.position.z);
       poseUpdateMeas_.pos() = JrJV;
-      
+
       QPD qJV(odometry->pose.pose.orientation.w,odometry->pose.pose.orientation.x,odometry->pose.pose.orientation.y,odometry->pose.pose.orientation.z);
       poseUpdateMeas_.att() = qJV.inverted();
 
@@ -744,6 +757,34 @@ class RovioNode{
           pubOdometry_.publish(odometryMsg_);
         }
 
+        if(pubPoseWithCovStamped_.getNumSubscribers() > 0 || forcePoseWithCovariancePublishing_){
+          // Compute covariance of output
+          imuOutputCT_.transformCovMat(state,cov,imuOutputCov_);
+
+          estimatedPoseWithCovarianceStampedMsg_.header.seq = msgSeq_;
+          estimatedPoseWithCovarianceStampedMsg_.header.stamp = ros::Time(mpFilter_->safe_.t_);
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.position.x = imuOutput_.WrWB()(0);
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.position.y = imuOutput_.WrWB()(1);
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.position.z = imuOutput_.WrWB()(2);
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.orientation.w = -imuOutput_.qBW().w();
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.orientation.x = imuOutput_.qBW().x();
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.orientation.y = imuOutput_.qBW().y();
+          estimatedPoseWithCovarianceStampedMsg_.pose.pose.orientation.z = imuOutput_.qBW().z();
+
+          for(unsigned int i=0;i<6;i++){
+            unsigned int ind1 = mtOutput::template getId<mtOutput::_pos>()+i;
+            if(i>=3) ind1 = mtOutput::template getId<mtOutput::_att>()+i-3;
+            for(unsigned int j=0;j<6;j++){
+              unsigned int ind2 = mtOutput::template getId<mtOutput::_pos>()+j;
+              if(j>=3) ind2 = mtOutput::template getId<mtOutput::_att>()+j-3;
+              estimatedPoseWithCovarianceStampedMsg_.pose.covariance[j+6*i] = imuOutputCov_(ind1,ind2);
+            }
+          }
+
+          pubPoseWithCovStamped_.publish(estimatedPoseWithCovarianceStampedMsg_);
+
+        }
+
         // Send IMU pose message.
         if(pubTransform_.getNumSubscribers() > 0 || forceTransformPublishing_){
           transformMsg_.header.seq = msgSeq_;
@@ -756,6 +797,23 @@ class RovioNode{
           transformMsg_.transform.rotation.z = imuOutput_.qBW().z();
           transformMsg_.transform.rotation.w = -imuOutput_.qBW().w();
           pubTransform_.publish(transformMsg_);
+        }
+
+        if(pub_T_J_W_transform.getNumSubscribers() > 0 || forceTransformPublishing_){
+          if (mpPoseUpdate_->inertialPoseIndex_ >= 0) {
+            Eigen::Vector3d IrIW = state.poseLin(mpPoseUpdate_->inertialPoseIndex_);
+            QPD qWI = state.poseRot(mpPoseUpdate_->inertialPoseIndex_);
+            T_J_W_Msg_.header.seq = msgSeq_;
+            T_J_W_Msg_.header.stamp = ros::Time(mpFilter_->safe_.t_);
+            T_J_W_Msg_.transform.translation.x = IrIW(0);
+            T_J_W_Msg_.transform.translation.y = IrIW(1);
+            T_J_W_Msg_.transform.translation.z = IrIW(2);
+            T_J_W_Msg_.transform.rotation.x = qWI.x();
+            T_J_W_Msg_.transform.rotation.y = qWI.y();
+            T_J_W_Msg_.transform.rotation.z = qWI.z();
+            T_J_W_Msg_.transform.rotation.w = -qWI.w();
+            pub_T_J_W_transform.publish(T_J_W_Msg_);
+          }
         }
 
         // Publish Extrinsics
